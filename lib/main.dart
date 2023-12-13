@@ -10,8 +10,11 @@ import 'constants.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => AuthProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => SelectedUsers()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -32,6 +35,31 @@ class MyApp extends StatelessWidget {
       home: const MyHomePage(title: 'Journey'),
     );
   }
+}
+
+class SelectedUsers extends ChangeNotifier {
+  List<dynamic> _users = [];
+
+  void addUser(Map<String, dynamic> user) {
+    _users.add(user);
+    notifyListeners();
+  }
+
+  void removeUser(Map<String, dynamic> user) {
+    _users.remove(user);
+    notifyListeners();
+  }
+  
+  bool containsUser(String id) {
+    for (var user in _users) {
+      if (user['id'] == id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<dynamic> get users => _users;
 }
 
 class AuthProvider extends ChangeNotifier {
@@ -482,13 +510,26 @@ class _UsersViewState extends State<UsersView> {
   }
 
   Widget buildUserCard(Map<String, dynamic> user) {
-    var letter = user['name'][0].toUpperCase();
-    return Card(
+    var letter = 'U';
+    if (user['profile'] != null) {
+      letter = user['profile']['pro_nombre'][0];
+    }
+
+  var avatar = user['profile'] != null ? user['profile']['pro_avatar'] : null;
+  var name = user['profile'] != null ? user['profile']['pro_nombre'] : "No name";
+  var lastname = user['profile'] != null ? user['profile']['pro_apelli'] : "No lastname";
+  var email = user['email'];
+  var role = user['role'][0];
+  var active = user['active'];
+
+  final _selectedUsers = Provider.of<SelectedUsers>(context);
+
+  return Card(
       child: ListTile(
-        leading: user['avatar'] != null ? ClipRRect(
+        leading: avatar != null ? ClipRRect(
           borderRadius: BorderRadius.circular(50),
           child: Image.network(
-          user['avatar']['url'], 
+          avatar, 
           width: 50,
           height: 50,
           fit: BoxFit.cover,
@@ -497,12 +538,18 @@ class _UsersViewState extends State<UsersView> {
       child: Text(letter),
       radius: 25,
     ),
-        title: Text('${user['name']} ${user['lastname']}'),
-        subtitle: Text(user['role'] == 'admin' ? 'Admin' : user['role'] == 'student' ? 'Student' : 'Unknown', style: const TextStyle(color: Colors.grey)),
-        trailing: Chip(
-            label: Text(user['active'] ? 'Active' : 'Inactive'),
-            backgroundColor: user['active'] ? Colors.green : Colors.red,
-          )
+        title: Text('$name $lastname'),
+        subtitle: Text(role == 'admin' ? 'Administrator' : role == 'professional' ? 'Professional' : role == 'user' ? 'User' : 'Unknown', style: const TextStyle(color: Colors.grey)),
+        //role Chip and add to SelectedUsers button
+        trailing: ElevatedButton(
+              onPressed: () {
+                if (!_selectedUsers.containsUser(user['id'])) {
+                  _selectedUsers.addUser(user);
+                }
+              },
+              child: Text(_selectedUsers.containsUser(user['id']) ? 'Selected' : 'Add'),
+            ),
+
       ),
     );
   }
@@ -527,6 +574,14 @@ class _UsersViewState extends State<UsersView> {
               ); // Navigate to the login/signup view and remove all previous routes
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.people),
+            onPressed: () {
+              navigator.push(
+                MaterialPageRoute(builder: (context) => const SelectedUsersView(title: 'Selected Users')),
+              );
+            },
+          ),
         ],
       ),
       body: ListView.builder(
@@ -536,6 +591,66 @@ class _UsersViewState extends State<UsersView> {
           return buildUserCard(user);
         },
       ),
+    );
+  }
+}
+
+class _SelectedUsersListView extends StatelessWidget {
+
+  @override
+  Widget build(BuildContext context) {
+    var list = context.watch<SelectedUsers>();
+    return ListView.builder(
+      itemCount: list.users.length,
+      itemBuilder: (context, index) {
+        final user = list.users[index];
+        return ListTile(
+          leading: user['profile'] != null ? ClipRRect(
+          borderRadius: BorderRadius.circular(50),
+          child: Image.network(
+          user['profile']['pro_avatar'],
+          width: 50,
+          height: 50,
+          fit: BoxFit.cover,
+          ),
+        ) : CircleAvatar(
+      child: Text(user['profile']['pro_nombre'][0]),
+      radius: 25,
+    ),
+          title: Text('${user['profile']['pro_nombre']} ${user['profile']['pro_apelli']}'),
+          subtitle: Text(user['email']),
+          trailing: IconButton(
+            icon: const Icon(Icons.remove_circle),
+            onPressed: () {
+              list.removeUser(user);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class SelectedUsersView extends StatelessWidget {
+  final String title;
+
+  const SelectedUsersView({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.check),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+      body: _SelectedUsersListView(),
     );
   }
 }

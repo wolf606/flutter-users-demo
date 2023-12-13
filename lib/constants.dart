@@ -1,1 +1,1 @@
-const String apiUrl = 'http://localhost:3900';
+const String apiUrl = 'https://probauam-backend-production-4fda.up.railway.app';
